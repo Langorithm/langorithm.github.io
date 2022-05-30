@@ -1996,8 +1996,8 @@ button,
       text-indent: 0;
       top: 0;
       width: inherit; }
-  #sidebar.inactive {
-    margin-left: -26em; }
+  /*#sidebar.inactive {
+    margin-left: -26em; }*/
   @media screen and (max-width: 1680px) {
     #sidebar {
       width: 24em; }
