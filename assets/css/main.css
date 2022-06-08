@@ -1219,7 +1219,8 @@ input[type="radio"] + label:before {
   position: relative; }
   .image img {
     border-radius: 0.375em;
-    display: block; }
+    display: block;
+    width: 100%; }
   .image.left, .image.right {
     max-width: 40%; }
     .image.left img, .image.right img {
@@ -1747,7 +1748,10 @@ button,
     flex-shrink: 1;
     margin: 0 0 6em 6em;
     position: relative;
-    width: calc(33.33333% - 6em); }
+    width: calc(33.33333% - 6em);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; }
     .posts article:before {
       background: rgba(210, 215, 217, 0.75);
       content: '';
