@@ -9,6 +9,7 @@ import {
   targetsWithDocumentEvalMode,
   webTargets,
 } from "@/settings.json";
+import { autocompletion } from "@codemirror/autocomplete";
 import { insertNewline, toggleLineComment } from "@codemirror/commands";
 import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
@@ -128,6 +129,8 @@ export interface EditorSettings {
   lineNumbers: boolean;
   wrapText: boolean;
   vimMode: boolean;
+  autocomplete: boolean;
+  autocompleteOnTyping: boolean;
 }
 
 export interface EditorProps extends ReactCodeMirrorProps {
@@ -142,12 +145,14 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
   const [fontLoaded, setFontLoaded] = useState(false);
   const query = useQuery();
 
-  const { theme, fontFamily, lineNumbers, wrapText, vimMode } = {
+  const { theme, fontFamily, lineNumbers, wrapText, vimMode, autocomplete, autocompleteOnTyping } = {
     theme: "dracula",
     fontFamily: "IBM Plex Mono",
     lineNumbers: false,
     wrapText: false,
     vimMode: false,
+    autocomplete: true,
+    autocompleteOnTyping: false,
     ...settings,
   };
 
@@ -228,6 +233,7 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
     flokSetup(document, { readOnly }),
     languageExtension ? languageExtension() : [],
     highlightExtension,
+    autocomplete ? autocompletion({ activateOnTyping: autocompleteOnTyping }) : [],
     readOnly ? EditorState.readOnly.of(true) : [],
     lineNumbers ? lineNumbersExtension() : [],
     vimMode ? vim() : [],
@@ -247,6 +253,7 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
         basicSetup={{
           foldGutter: false,
           lineNumbers: false,
+          autocompletion: false,
         }}
         {...props}
       />

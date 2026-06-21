@@ -68,6 +68,8 @@ const defaultEditorSettings: EditorSettings = {
   fontFamily: "Inconsolata",
   theme: "oneDark",
   wrapText: false,
+  autocomplete: true,
+  autocompleteOnTyping: false,
 };
 
 interface SessionLoaderParams {
