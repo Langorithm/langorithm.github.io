@@ -19,6 +19,7 @@ import {
   lineNumbers as lineNumbersExtension,
 } from "@codemirror/view";
 import { evalKeymap, flashField, remoteEvalFlash } from "@flok-editor/cm-eval";
+import { hydra } from "@flok-editor/lang-hydra";
 import { punctual } from "@flok-editor/lang-punctual";
 import { tidal } from "@flok-editor/lang-tidal";
 import { zwirn } from "@flok-editor/lang-zwirn";
@@ -38,6 +39,7 @@ const langByTarget = langByTargetUntyped as { [lang: string]: string };
 const langExtensionsByLanguage: { [lang: string]: any } = {
   javascript: javascript,
   python: python,
+  hydra: hydra,
   tidal: tidal,
   zwirn: zwirn,
   punctual: punctual,

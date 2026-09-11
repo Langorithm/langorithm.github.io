@@ -19,7 +19,7 @@
   "defaultTarget": "hydra",
   "langByTarget": {
     "foxdot": "python",
-    "hydra": "javascript",
+    "hydra": "hydra",
     "mercury-web": "javascript",
     "mercury": "javascript",
     "punctual": "punctual",
