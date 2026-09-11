@@ -7,7 +7,7 @@ export interface Signature {
   params: { name: string; default?: number | string | null }[];
 }
 
-const formatDefault = (def: number | string | null | undefined): string =>
+export const formatDefault = (def: number | string | null | undefined): string =>
   def === undefined || def === null ? "" : ` = ${JSON.stringify(def)}`;
 
 const formatParams = (sig: Signature): string =>

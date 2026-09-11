@@ -1,6 +1,7 @@
 import { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import { javascriptLanguage } from "@codemirror/lang-javascript";
 import { argContextAt, receiverBefore } from "./context";
+import { hydraSignatureHelp } from "./signature";
 import {
   arrayMethodCompletions,
   arrayMethodNames,
@@ -83,5 +84,6 @@ export function hydra() {
   return [
     javascriptLanguage,
     javascriptLanguage.data.of({ autocomplete: hydraCompletionSource }),
+    hydraSignatureHelp(),
   ];
 }
