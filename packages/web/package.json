@@ -19,7 +19,6 @@
     "prebuild": "node script/prebuild.js",
     "build": "npm run prebuild && tsc && vite build",
     "start": "node ./bin/flok-web.js",
-    "deploy": "bash script/deploy.sh",
     "check": "tsc --noEmit",
     "lint": "prettier -c .",
     "format": "prettier -w ."

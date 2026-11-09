@@ -1,0 +1,59 @@
+# Build the web app and publish it to GitHub Pages on every push to main.
+# The site syncs sessions through flok.cc, so it needs no server of its own.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Install scripts aren't needed to build the site.
+      - run: npm ci --ignore-scripts
+      # In dependency order; the root `npm run build` (lerna) isn't used.
+      - name: Build packages
+        run: |
+          for p in pubsub session server-middleware cm-eval cm-learn \
+                   lang-hydra lang-strudel lang-punctual lang-tidal lang-zwirn; do
+            npm run build --workspace packages/$p
+          done
+      - name: Build site
+        run: npm run build --workspace packages/web
+        env:
+          VITE_FLOK_SERVER: https://flok.cc
+      # Pages has no rewrites: serve the app for every route (/s/<name>,
+      # /frames/<target>) through the 404 page, and skip Jekyll.
+      - name: Prepare for Pages
+        run: |
+          cp packages/web/dist/index.html packages/web/dist/404.html
+          touch packages/web/dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
