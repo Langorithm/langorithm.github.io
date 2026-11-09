@@ -13,5 +13,10 @@ export {
   wordAt,
   wordCompletion,
 } from "./structure";
-export { miniSpans, roleHighlighting } from "./roles";
+export {
+  depthRoles,
+  miniDepthSpans,
+  miniSpans,
+  roleHighlighting,
+} from "./roles";
 export type { RoleClassifier, RoleSpan, RoleSpec } from "./roles";

@@ -1,19 +1,14 @@
 import { syntaxTree } from "@codemirror/language";
-import { miniSpans } from "@flok-editor/cm-learn";
+import { depthRoles, miniDepthSpans } from "@flok-editor/cm-learn";
 import type { RoleClassifier, RoleSpan, RoleSpec } from "@flok-editor/cm-learn";
-import { tags as t } from "@lezer/highlight";
 import { fnByName } from "./completions";
 
-// What gets its own colour in Strudel code: the parts of a pattern, and
+// What gets its own colour in Strudel code: patterns by nesting level, and
 // functions by what they're for (from the same groups as the lists).
 
 export const strudelRoles: RoleSpec[] = [
-  { name: "mini-number", group: "pattern", prefer: t.number },
-  { name: "mini-operator", group: "pattern", prefer: t.operator },
-  { name: "mini-bracket", group: "pattern", prefer: t.bracket },
-  { name: "mini-separator", group: "pattern", prefer: t.separator },
-  // A rest is silence: it gets the comment colour.
-  { name: "rest", group: "rest", prefer: t.comment },
+  // Patterns: by nesting level (see miniDepthSpans).
+  ...depthRoles,
   { name: "fn-start", group: "function" },
   { name: "fn-effect", group: "function" },
   { name: "fn-time", group: "function" },
@@ -39,7 +34,7 @@ export const strudelColors: RoleClassifier = (state, from, to) => {
         const quote = state.sliceDoc(node.from, node.from + 1);
         if (quote === '"' || quote === "`")
           spans.push(
-            ...miniSpans(
+            ...miniDepthSpans(
               state.sliceDoc(node.from + 1, node.to - 1),
               node.from + 1,
             ),

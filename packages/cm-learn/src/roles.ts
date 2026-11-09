@@ -39,6 +39,15 @@ export interface RoleSpec {
   name: string;
   group: string;
   prefer?: Tag;
+  /**
+   * A nesting level: level 0 is the theme's string colour, each deeper level
+   * the theme colour nearest in hue to it among those not yet used.
+   */
+  depth?: number;
+  /** Share another role's colour instead of getting one. */
+  colorOf?: string;
+  /** Extra CSS for the role, e.g. a dimmer opacity. */
+  style?: Record<string, string>;
 }
 
 // Theme tags to borrow colours from, roughly from most to least common.
@@ -93,7 +102,14 @@ const pickColors = (view: EditorView, roles: RoleSpec[]) => {
   }
   const usedInGroup = new Map<string, Set<string>>();
   const colors = new Map<string, string>();
+  const depthColors = string ? depthPalette(string, palette) : [];
   for (const role of roles) {
+    if (role.colorOf) continue;
+    if (role.depth !== undefined) {
+      const color = depthColors[role.depth % Math.max(depthColors.length, 1)];
+      if (color) colors.set(role.name, color);
+      continue;
+    }
     const used = usedInGroup.get(role.group) ?? new Set<string>();
     usedInGroup.set(role.group, used);
     let color = role.prefer ? probeColor(view, role.prefer) : null;
@@ -109,6 +125,72 @@ const pickColors = (view: EditorView, roles: RoleSpec[]) => {
     }
   }
   return colors;
+};
+
+const rgbOf = (color: string): [number, number, number] | null => {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(color);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+};
+
+const hslOf = ([r, g, b]: [number, number, number]) => {
+  const [rr, gg, bb] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (!d) return { h: 0, s: 0, l };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h =
+    max === rr
+      ? ((gg - bb) / d + 6) % 6
+      : max === gg
+        ? (bb - rr) / d + 2
+        : (rr - gg) / d + 4;
+  return { h: h * 60, s, l };
+};
+
+const hueDistance = (a: number, b: number) => {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+};
+
+/**
+ * Colours for nesting levels: the base (string) colour, then the theme's
+ * colours by how close their hue is to it, so levels drift through similar
+ * colours wherever that theme's palette lies. Colours nearly identical to
+ * one already chosen are skipped. With too few, fall back to hue steps.
+ */
+const depthPalette = (
+  base: string,
+  palette: string[],
+  levels = 6,
+): string[] => {
+  const baseRgb = rgbOf(base);
+  if (!baseRgb) return [base];
+  const baseHsl = hslOf(baseRgb);
+  const chosen = [base];
+  const byHue = palette
+    .map((c) => ({ c, hsl: rgbOf(c) && hslOf(rgbOf(c)!) }))
+    .filter((x) => x.hsl && x.hsl.s > 0.15)
+    .sort(
+      (a, b) =>
+        hueDistance(a.hsl!.h, baseHsl.h) - hueDistance(b.hsl!.h, baseHsl.h),
+    );
+  for (const { c, hsl } of byHue) {
+    if (chosen.length >= levels) break;
+    const close = chosen.some((x) => {
+      const o = rgbOf(x) && hslOf(rgbOf(x)!);
+      return o && hueDistance(o.h, hsl!.h) < 12;
+    });
+    if (!close) chosen.push(c);
+  }
+  for (let i = 1; chosen.length < levels; i++) {
+    const h = (baseHsl.h + 28 * i) % 360;
+    chosen.push(
+      `hsl(${h}, ${Math.round(baseHsl.s * 100)}%, ${Math.round(baseHsl.l * 100)}%)`,
+    );
+  }
+  return chosen;
 };
 
 const markFor = new Map<string, Decoration>();
@@ -177,7 +259,10 @@ export const roleHighlighting = (
     Object.fromEntries(
       roles.map((r) => [
         `.cm-role-${r.name}, .cm-role-${r.name} *`,
-        { color: `var(--cm-role-${r.name}) !important` },
+        {
+          color: `var(--cm-role-${r.colorOf ?? r.name}) !important`,
+          ...r.style,
+        },
       ]),
     ),
   );
@@ -209,6 +294,73 @@ export const miniSpans = (text: string, start: number): RoleSpan[] => {
       else if ("[]<>{}()".includes(c)) add(i, i + 1, "mini-bracket");
       else if (",|.".includes(c)) add(i, i + 1, "mini-separator");
       else if (c === "~" || c === "-") add(i, i + 1, "rest");
+      i++;
+    }
+  }
+  return spans;
+};
+
+const maxDepth = 6;
+
+/**
+ * Roles for colouring a pattern by nesting: depth-0 … depth-5 (level 0 is
+ * the string colour), the same dimmed for operators (depth-N-op), and rests.
+ */
+export const depthRoles: RoleSpec[] = [
+  ...Array.from({ length: maxDepth }, (_, d) => ({
+    name: `depth-${d}`,
+    group: "depth",
+    depth: d,
+  })),
+  ...Array.from({ length: maxDepth }, (_, d) => ({
+    name: `depth-${d}-op`,
+    group: "depth",
+    colorOf: `depth-${d}`,
+    style: { opacity: "0.7" },
+  })),
+  { name: "rest", group: "rest", prefer: t.comment },
+];
+
+/**
+ * A Strudel mini-notation pattern coloured by nesting, at document offset
+ * `start`: everything inside a [ ] or < > takes its level's colour, the
+ * brackets included, so a group reads as one block. Operators (*2, !, ,)
+ * take their level's colour, dimmed; rests are dimmed like comments.
+ * Level 0 words keep the plain string colour.
+ */
+export const miniDepthSpans = (text: string, start: number): RoleSpan[] => {
+  const spans: RoleSpan[] = [];
+  const level = (d: number) => `depth-${d % maxDepth}`;
+  const add = (from: number, to: number, role: string) =>
+    spans.push({ from: start + from, to: start + to, role });
+  let depth = 0;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    const token = /^[\w#.^'-]+/.exec(text.slice(i))?.[0];
+    if ("[<{(".includes(c)) {
+      depth++;
+      add(i, i + 1, level(depth));
+      i++;
+    } else if ("]>})".includes(c)) {
+      add(i, i + 1, level(depth));
+      depth = Math.max(depth - 1, 0);
+      i++;
+    } else if ("*/!@?:%".includes(c)) {
+      // The operator and the number it takes: *2, @3.
+      const arg = /^[\d.]*/.exec(text.slice(i + 1))![0];
+      add(i, i + 1 + arg.length, `${level(depth)}-op`);
+      i += 1 + arg.length;
+    } else if (",|".includes(c)) {
+      add(i, i + 1, `${level(depth)}-op`);
+      i++;
+    } else if (c === "~" || (c === "-" && !/[\w.]/.test(text[i + 1] ?? ""))) {
+      add(i, i + 1, "rest");
+      i++;
+    } else if (token) {
+      if (depth > 0) add(i, i + token.length, level(depth));
+      i += token.length;
+    } else {
       i++;
     }
   }
