@@ -1,5 +1,10 @@
 import { highlightingFor, syntaxTree } from "@codemirror/language";
-import { EditorState, Extension, RangeSetBuilder } from "@codemirror/state";
+import {
+  EditorState,
+  Extension,
+  Facet,
+  RangeSetBuilder,
+} from "@codemirror/state";
 import {
   Decoration,
   DecorationSet,
@@ -15,6 +20,33 @@ import { Tag, tags as t } from "@lezer/highlight";
 // --cm-role-<name>. For now the variables are filled from the active theme's
 // own palette, picking colours so that roles in the same group differ; a
 // theme can later set them itself instead.
+
+/** Ways to tone the colouring down, each on its own. */
+export interface ColorSettings {
+  /** Nested levels as shades of the string colour, not other colours. */
+  shades: boolean;
+  /** Only two looks: top level and "inside brackets". */
+  twoLevels: boolean;
+  /** Colour only the brackets; their contents keep the string colour. */
+  bracketsOnly: boolean;
+  /** Only chain-starting functions (s, note, osc...) get a colour. */
+  quietFunctions: boolean;
+  /** Operators (*2 , !) in their level's colour, not dimmed. */
+  evenOperators: boolean;
+}
+
+export const defaultColorSettings: ColorSettings = {
+  shades: false,
+  twoLevels: false,
+  bracketsOnly: false,
+  quietFunctions: false,
+  evenOperators: false,
+};
+
+export const colorSettings = Facet.define<
+  Partial<ColorSettings>,
+  ColorSettings
+>({ combine: (values) => ({ ...defaultColorSettings, ...values[0] }) });
 
 /** A span of code and the role it plays. */
 export interface RoleSpan {
@@ -102,7 +134,12 @@ const pickColors = (view: EditorView, roles: RoleSpec[]) => {
   }
   const usedInGroup = new Map<string, Set<string>>();
   const colors = new Map<string, string>();
-  const depthColors = string ? depthPalette(string, palette) : [];
+  const settings = view.state.facet(colorSettings);
+  const depthColors = string
+    ? settings.shades
+      ? depthShades(string)
+      : depthPalette(string, palette)
+    : [];
   for (const role of roles) {
     if (role.colorOf) continue;
     if (role.depth !== undefined) {
@@ -193,6 +230,23 @@ const depthPalette = (
   return chosen;
 };
 
+/**
+ * Nesting levels as shades of the base colour: same hue, each level a little
+ * dimmer and less saturated, so a pattern reads as one colour family.
+ */
+const depthShades = (base: string, levels = 6): string[] => {
+  const rgb = rgbOf(base);
+  if (!rgb) return [base];
+  const { h, s, l } = hslOf(rgb);
+  return Array.from({ length: levels }, (_, d) =>
+    d === 0
+      ? base
+      : `hsl(${Math.round(h)}, ${Math.round(s * 100 * (1 - 0.12 * d))}%, ${Math.round(
+          l * 100 * (1 - 0.1 * d),
+        )}%)`,
+  );
+};
+
 const markFor = new Map<string, Decoration>();
 const mark = (role: string) => {
   let m = markFor.get(role);
@@ -213,15 +267,17 @@ export const roleHighlighting = (
         this.paint(view);
       }
       update(update: ViewUpdate) {
+        const reconfigured = update.transactions.some((tr) => tr.reconfigured);
         if (
+          reconfigured ||
           update.docChanged ||
           update.viewportChanged ||
           syntaxTree(update.state) !== syntaxTree(update.startState)
         )
           this.decorations = this.build(update.view);
         // A new theme: borrow its colours.
-        if (update.transactions.some((tr) => tr.reconfigured))
-          this.paint(update.view);
+        // A new theme or new settings: pick colours again.
+        if (reconfigured) this.paint(update.view);
       }
       build(view: EditorView) {
         const spans: RoleSpan[] = [];
@@ -241,6 +297,11 @@ export const roleHighlighting = (
         view.requestMeasure({
           read: () => pickColors(view, roles),
           write: (colors) => {
+            const even = view.state.facet(colorSettings).evenOperators;
+            view.dom.style.setProperty(
+              "--cm-role-op-opacity",
+              even ? "1" : "0.7",
+            );
             for (const role of roles) {
               const color = colors.get(role.name);
               if (color)
@@ -316,7 +377,7 @@ export const depthRoles: RoleSpec[] = [
     name: `depth-${d}-op`,
     group: "depth",
     colorOf: `depth-${d}`,
-    style: { opacity: "0.7" },
+    style: { opacity: "var(--cm-role-op-opacity, 0.7)" },
   })),
   { name: "rest", group: "rest", prefer: t.comment },
 ];
@@ -328,9 +389,14 @@ export const depthRoles: RoleSpec[] = [
  * take their level's colour, dimmed; rests are dimmed like comments.
  * Level 0 words keep the plain string colour.
  */
-export const miniDepthSpans = (text: string, start: number): RoleSpan[] => {
+export const miniDepthSpans = (
+  text: string,
+  start: number,
+  settings: ColorSettings = defaultColorSettings,
+): RoleSpan[] => {
   const spans: RoleSpan[] = [];
-  const level = (d: number) => `depth-${d % maxDepth}`;
+  const level = (d: number) =>
+    `depth-${settings.twoLevels ? Math.min(d, 1) : d % maxDepth}`;
   const add = (from: number, to: number, role: string) =>
     spans.push({ from: start + from, to: start + to, role });
   let depth = 0;
@@ -358,7 +424,8 @@ export const miniDepthSpans = (text: string, start: number): RoleSpan[] => {
       add(i, i + 1, "rest");
       i++;
     } else if (token) {
-      if (depth > 0) add(i, i + token.length, level(depth));
+      if (depth > 0 && !settings.bracketsOnly)
+        add(i, i + token.length, level(depth));
       i += token.length;
     } else {
       i++;

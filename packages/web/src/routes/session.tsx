@@ -2,6 +2,8 @@ import { CommandsButton } from "@/components/commands-button";
 import { ConfigureDialog } from "@/components/configure-dialog";
 import DisplaySettingsDialog from "@/components/display-settings-dialog";
 import { Editor, EditorSettings } from "@/components/editor";
+import { defaultColorSettings } from "@flok-editor/cm-learn";
+import type { ColorSettings } from "@flok-editor/cm-learn";
 import { MessagesPanel } from "@/components/messages-panel";
 import { Mosaic } from "@/components/mosaic";
 import { Pane } from "@/components/pane";
@@ -141,6 +143,22 @@ export function Component() {
       return defaultDisplaySettings;
     },
   );
+
+  // How strongly code is coloured: yours, for every pane.
+  const [colorSettings, setColorSettings] = useState<ColorSettings>(() => {
+    try {
+      return {
+        ...defaultColorSettings,
+        ...JSON.parse(localStorage.getItem("color-settings") || "{}"),
+      };
+    } catch {
+      return defaultColorSettings;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("color-settings", JSON.stringify(colorSettings));
+  }, [colorSettings]);
 
   // Save editor settings to local storage
   useEffect(() => {
@@ -688,6 +706,8 @@ export function Component() {
               key={doc.id}
               document={doc}
               onTargetChange={handleTargetSelectChange}
+              colorSettings={colorSettings}
+              onColorSettingsChange={setColorSettings}
               onEvaluateButtonClick={handleEvaluateButtonClick}
               onCommandsButtonClick={() => setCommandsDialogOpen(true)}
             >
@@ -696,6 +716,7 @@ export function Component() {
                 document={doc}
                 autoFocus={i === 0}
                 settings={editorSettings}
+                colorSettings={colorSettings}
                 className="absolute top-6 overflow-auto flex-grow w-full h-[calc(100%-32px)] z-10"
               />
             </Pane>

@@ -1,5 +1,5 @@
 import { syntaxTree } from "@codemirror/language";
-import { miniSpans } from "@flok-editor/cm-learn";
+import { colorSettings, miniSpans } from "@flok-editor/cm-learn";
 import type { RoleClassifier, RoleSpan, RoleSpec } from "@flok-editor/cm-learn";
 import { tags as t } from "@lezer/highlight";
 import { hydraFunctions } from "./hydra-api";
@@ -38,6 +38,7 @@ const roleOf = new Map<string, string>([
 ]);
 
 export const hydraColors: RoleClassifier = (state, from, to) => {
+  const quiet = state.facet(colorSettings).quietFunctions;
   const spans: RoleSpan[] = [];
   syntaxTree(state).iterate({
     from,
@@ -47,7 +48,9 @@ export const hydraColors: RoleClassifier = (state, from, to) => {
       if (node.name === "VariableName" || node.name === "PropertyName") {
         const name = text();
         const role = /^[os][0-3]$/.test(name) ? "buffer" : roleOf.get(name);
-        if (role) spans.push({ from: node.from, to: node.to, role });
+        // Quiet functions: only sources (which start a chain) and buffers.
+        const shown = !quiet || role === "fn-start" || role === "buffer";
+        if (role && shown) spans.push({ from: node.from, to: node.to, role });
       } else if (node.name === "String") {
         // P("...") takes a Strudel pattern.
         const call = node.node.parent?.parent;

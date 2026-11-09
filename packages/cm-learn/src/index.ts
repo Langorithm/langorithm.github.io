@@ -14,9 +14,16 @@ export {
   wordCompletion,
 } from "./structure";
 export {
+  colorSettings,
+  defaultColorSettings,
   depthRoles,
   miniDepthSpans,
   miniSpans,
   roleHighlighting,
 } from "./roles";
-export type { RoleClassifier, RoleSpan, RoleSpec } from "./roles";
+export type {
+  ColorSettings,
+  RoleClassifier,
+  RoleSpan,
+  RoleSpec,
+} from "./roles";

@@ -23,6 +23,8 @@ import {
 } from "@codemirror/view";
 import { evalKeymap, flashField, remoteEvalFlash } from "@flok-editor/cm-eval";
 import { hydra } from "@flok-editor/lang-hydra";
+import { colorSettings as colorSettingsFacet } from "@flok-editor/cm-learn";
+import type { ColorSettings } from "@flok-editor/cm-learn";
 import { strudel } from "@flok-editor/lang-strudel";
 import { punctual } from "@flok-editor/lang-punctual";
 import { tidal } from "@flok-editor/lang-tidal";
@@ -142,10 +144,18 @@ export interface EditorProps extends ReactCodeMirrorProps {
   document?: Document;
   extensionSettings?: any;
   settings?: EditorSettings;
+  /** How strongly code is coloured (see the colour menu). */
+  colorSettings?: ColorSettings;
   ref: React.RefObject<ReactCodeMirrorRef>;
 }
 
-export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
+export const Editor = ({
+  document,
+  settings,
+  colorSettings,
+  ref,
+  ...props
+}: EditorProps) => {
   const [mounted, setMounted] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const query = useQuery();
@@ -237,6 +247,7 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
     }),
     flokSetup(document, { readOnly }),
     languageExtension ? languageExtension() : [],
+    colorSettings ? colorSettingsFacet.of(colorSettings) : [],
     highlightExtension,
     document.target === "strudel" ? strudelSliders() : [],
     autocomplete ? autocompletion({ activateOnTyping: autocompleteOnTyping }) : [],

@@ -1,5 +1,9 @@
 import { syntaxTree } from "@codemirror/language";
-import { depthRoles, miniDepthSpans } from "@flok-editor/cm-learn";
+import {
+  colorSettings,
+  depthRoles,
+  miniDepthSpans,
+} from "@flok-editor/cm-learn";
 import type { RoleClassifier, RoleSpan, RoleSpec } from "@flok-editor/cm-learn";
 import { fnByName } from "./completions";
 
@@ -24,6 +28,7 @@ const roleByGroup: Record<string, string> = {
 };
 
 export const strudelColors: RoleClassifier = (state, from, to) => {
+  const settings = state.facet(colorSettings);
   const spans: RoleSpan[] = [];
   syntaxTree(state).iterate({
     from,
@@ -37,18 +42,17 @@ export const strudelColors: RoleClassifier = (state, from, to) => {
             ...miniDepthSpans(
               state.sliceDoc(node.from + 1, node.to - 1),
               node.from + 1,
+              settings,
             ),
           );
         return false;
       }
       if (node.name === "VariableName" || node.name === "PropertyName") {
         const fn = fnByName.get(state.sliceDoc(node.from, node.to));
-        if (fn)
-          spans.push({
-            from: node.from,
-            to: node.to,
-            role: roleByGroup[fn.group] ?? "fn-other",
-          });
+        const role = fn && (roleByGroup[fn.group] ?? "fn-other");
+        // Quiet functions: only the ones starting a chain keep a colour.
+        if (role && (!settings.quietFunctions || role === "fn-start"))
+          spans.push({ from: node.from, to: node.to, role });
       }
     },
   });
