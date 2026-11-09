@@ -6,6 +6,7 @@ import {
 import { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useCallback } from "react";
 import { useAnimationFrame } from "./use-animation-frame";
+import { syncSliderWidgets } from "@/lib/strudel-sliders";
 import { forEachDocumentContext } from "@/lib/utils";
 
 export function useStrudelCodemirrorExtensions(
@@ -22,6 +23,7 @@ export function useStrudelCodemirrorExtensions(
           if (!view) return;
           updateMiniLocations(view, ctx.miniLocations || []);
           highlightMiniLocations(view, ctx.phase || 0, ctx.haps || []);
+          syncSliderWidgets(view, ctx.widgets);
         },
         session,
         editorRefs,

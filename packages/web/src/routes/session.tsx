@@ -197,7 +197,13 @@ export function Component() {
   useEffect(() => {
     if (!name) return;
 
-    const { hostname, port, protocol } = window.location;
+    // Sync through the server this page was served from, or through the one
+    // set at build time with VITE_FLOK_SERVER (e.g. https://flok.cc), so a
+    // statically hosted build can join sessions on another flok server.
+    const server = import.meta.env.VITE_FLOK_SERVER;
+    const { hostname, port, protocol } = server
+      ? new URL(server)
+      : window.location;
     const isSecure = protocol === "https:";
     const newSession = new Session(name, {
       hostname,

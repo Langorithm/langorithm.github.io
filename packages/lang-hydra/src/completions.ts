@@ -7,11 +7,17 @@ export interface Signature {
   params: { name: string; default?: number | string | null }[];
 }
 
-export const formatDefault = (def: number | string | null | undefined): string =>
+export const formatDefault = (
+  def: number | string | null | undefined,
+): string =>
   def === undefined || def === null ? "" : ` = ${JSON.stringify(def)}`;
 
 const formatParams = (sig: Signature): string =>
   sig.params.map((p) => `${p.name}${formatDefault(p.default)}`).join(", ");
+
+/** name(param = default, ...) */
+export const formatSignature = (sig: Signature): string =>
+  `${sig.name}(${formatParams(sig)})`;
 
 // combine/combineCoord functions take a texture as their first JS argument
 // (the shader's _c0), which is implicit in hydra-synth's input list.
@@ -26,11 +32,33 @@ const signatureOf = (fn: HydraFn): Signature => ({
   ],
 });
 
+/** List sections, named as in Hydra's docs, by hydra-synth's function types. */
+const sectionByType = {
+  src: { name: "source", rank: 0 },
+  coord: { name: "geometry", rank: 1 },
+  color: { name: "color", rank: 2 },
+  combine: { name: "blend", rank: 3 },
+  combineCoord: { name: "modulate", rank: 4 },
+};
+
 const completionOf = (fn: HydraFn, type: string): Completion => ({
   label: fn.name,
   type,
+  section: sectionByType[fn.type],
   detail: `(${formatParams(signatureOf(fn))})`,
+  info: () => functionCard(fn),
 });
+
+/** A function's detail panel: its signature with defaults and its type. */
+const functionCard = (fn: HydraFn): HTMLElement => {
+  const dom = document.createElement("div");
+  const head = dom.appendChild(document.createElement("div"));
+  head.style.fontWeight = "bold";
+  head.textContent = formatSignature(signatureOf(fn));
+  dom.appendChild(document.createElement("div")).textContent =
+    `type: ${fn.type}`;
+  return dom;
+};
 
 // --- Generated from hydra-synth ---
 
@@ -46,6 +74,7 @@ export const methodCompletions: Completion[] = [
   {
     label: "out",
     type: "method",
+    section: { name: "output", rank: 5 },
     detail: "(output = o0)",
     info: "Send the chain to an output buffer.",
   },
@@ -220,18 +249,31 @@ export const arrowSlotCompletions: Completion[] = [
 
 // In a numeric slot outside an arrow function, plain globals would be frozen
 // at eval time, so offer the dynamic forms instead.
+/**
+ * The forms a number argument can take besides a plain number, shown by
+ * shape when writing (detail) and explained when learning (info).
+ */
 export const numericSlotCompletions: Completion[] = [
+  snippetCompletion("[${}]", {
+    label: "[ ]",
+    boost: 3,
+    detail: "sequence",
+    type: "keyword",
+    info: "Steps through the values, one per beat (bpm, default 30): [0, 1.57]",
+  }),
   snippetCompletion("() => ${}", {
     label: "() =>",
-    detail: "arrow function",
+    boost: 2,
+    detail: "every frame",
     type: "keyword",
-    info: "Re-evaluated every frame. Use for time, mouse, fft, etc.",
+    info: "Re-evaluated every frame. Use for time, mouse, fft, etc.: () => time * 0.1",
   }),
   snippetCompletion('P("${}")', {
-    label: "P",
-    detail: "(pattern)",
+    label: 'P("")',
+    boost: 1,
+    detail: "pattern",
     type: "function",
-    info: "Sample a Strudel mini-notation pattern every frame.",
+    info: 'Samples a Strudel mini-notation pattern every frame: P("0 1.57")',
   }),
 ];
 

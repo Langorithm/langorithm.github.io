@@ -156,7 +156,11 @@ export class StrudelWrapper {
         const docId = options.code.split("//").slice(-1)[0];
         if (!docId) return;
         const miniLocations = options.meta?.miniLocations;
-        updateDocumentsContext(docId, { miniLocations });
+        // slider(...) positions and ranges, for the editor's slider widgets
+        const widgets = options.meta?.widgets?.filter(
+          (w: any) => w.type === "slider",
+        );
+        updateDocumentsContext(docId, { miniLocations, widgets });
       },
       beforeEval: () => {},
       onSchedulerError: (e: unknown) => this._onError(`${e}`),

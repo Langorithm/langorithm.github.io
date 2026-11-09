@@ -27,7 +27,7 @@
     "sardine": "python",
     "sclang": "javascript",
     "remote_sclang": "javascript",
-    "strudel": "javascript",
+    "strudel": "strudel",
     "mondo-strudel": "javascript",
     "textmode": "javascript",
     "tidal": "tidal",

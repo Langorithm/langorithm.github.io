@@ -41,9 +41,18 @@ export const argContextAt = (
 ): ArgContext | null => {
   let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
   let inArrowFn = false;
-  for (; node; node = node.parent) {
-    if (node.name === "ArrowFunction") inArrowFn = true;
-    if (node.name !== "ArgList") continue;
+  while (node) {
+    const isArgList = node.name === "ArgList";
+    // Right after a closing paren is outside that call: osc(60)| is not in
+    // osc, and an arrow function inside it doesn't count either.
+    const closedBefore =
+      isArgList && node.lastChild?.name === ")" && pos >= node.lastChild.to;
+    if (closedBefore) inArrowFn = false;
+    else if (node.name === "ArrowFunction") inArrowFn = true;
+    if (isArgList && !closedBefore) break;
+    node = node.parent;
+  }
+  if (node) {
     const callExpr = node.parent;
     if (!callExpr || callExpr.name !== "CallExpression") return null;
     const callee = calleeName(state, callExpr);
@@ -77,10 +86,16 @@ export const receiverBefore = (
   dotPos: number,
   arrayMethodNames: Set<string>,
 ): Receiver | null => {
-  let node: SyntaxNode | null = syntaxTree(state).resolveInner(dotPos, -1);
-  if (!node || node.to > dotPos) return null; // dot inside a token: 0.5
-  // Climb to the widest node ending exactly at the dot.
-  while (node.parent && node.parent.to === dotPos) node = node.parent;
+  const tree = syntaxTree(state);
+  if (tree.resolveInner(dotPos, 1).name === "Number") return null; // 0.5
+  // The receiver ends at the dot, or before the newline and spaces of a
+  // chain written one method per line.
+  let end = dotPos;
+  while (end > 0 && /\s/.test(state.sliceDoc(end - 1, end))) end--;
+  let node: SyntaxNode | null = tree.resolveInner(end, -1);
+  if (!node || node.to > end) return null;
+  // Climb to the widest node ending exactly there.
+  while (node.parent && node.parent.to === end) node = node.parent;
   if (node.name === "ArrayExpression") return { kind: "array" };
   if (node.name === "VariableName") {
     const name = state.sliceDoc(node.from, node.to);

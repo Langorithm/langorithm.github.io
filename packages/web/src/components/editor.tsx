@@ -1,5 +1,7 @@
 import { useQuery } from "@/hooks/use-query";
 import { loadFont } from "@/lib/fonts";
+import { strudelSliders } from "@/lib/strudel-sliders";
+import { strudelBankNames, strudelSounds } from "@/lib/strudel-sounds";
 import themes from "@/lib/themes";
 import {
   langByTarget as langByTargetUntyped,
@@ -21,6 +23,7 @@ import {
 } from "@codemirror/view";
 import { evalKeymap, flashField, remoteEvalFlash } from "@flok-editor/cm-eval";
 import { hydra } from "@flok-editor/lang-hydra";
+import { strudel } from "@flok-editor/lang-strudel";
 import { punctual } from "@flok-editor/lang-punctual";
 import { tidal } from "@flok-editor/lang-tidal";
 import { zwirn } from "@flok-editor/lang-zwirn";
@@ -41,6 +44,8 @@ const langExtensionsByLanguage: { [lang: string]: any } = {
   javascript: javascript,
   python: python,
   hydra: hydra,
+  strudel: () =>
+    strudel({ sounds: strudelSounds, bankNames: strudelBankNames }),
   tidal: tidal,
   zwirn: zwirn,
   punctual: punctual,
@@ -233,6 +238,7 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
     flokSetup(document, { readOnly }),
     languageExtension ? languageExtension() : [],
     highlightExtension,
+    document.target === "strudel" ? strudelSliders() : [],
     autocomplete ? autocompletion({ activateOnTyping: autocompleteOnTyping }) : [],
     readOnly ? EditorState.readOnly.of(true) : [],
     lineNumbers ? lineNumbersExtension() : [],
@@ -254,6 +260,9 @@ export const Editor = ({ document, settings, ref, ...props }: EditorProps) => {
           foldGutter: false,
           lineNumbers: false,
           autocompletion: false,
+          // Alt is for learning (Alt-hover, Alt-click); keep Alt-drag
+          // column selection but not its crosshair pointer.
+          crosshairCursor: false,
         }}
         {...props}
       />
