@@ -7,6 +7,7 @@ import {
   StateField,
 } from "@codemirror/state";
 import { Decoration, EditorView, keymap, showTooltip } from "@codemirror/view";
+import { colorAt } from "./hover";
 
 // Same look as the hover underline (cm-learn-target, styled in hover.ts).
 const cardUnderline = Decoration.mark({ class: "cm-learn-target" });
@@ -87,6 +88,12 @@ const cardField = StateField.define<Card | null>({
 
 const showCard = (view: EditorView, card: Card | null) => {
   if (!card) return false;
+  // Underline in the colour of the text it's about, as hover does.
+  if (card.underline) {
+    const at = view.coordsAtPos(card.underline.from, 1);
+    const color = at && colorAt(at.left + 1, (at.top + at.bottom) / 2);
+    if (color) view.dom.style.setProperty("--cm-learn-underline", color);
+  }
   view.dispatch({ effects: setCard.of(card) });
   return true;
 };

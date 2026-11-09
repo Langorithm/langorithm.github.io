@@ -13,6 +13,7 @@ import {
   ViewUpdate,
 } from "@codemirror/view";
 import { Tag, tags as t } from "@lezer/highlight";
+import { notCursors } from "./hover";
 
 // Colour by role: what a piece of code is for, beyond what the JavaScript
 // parser can tell (a pattern's operators and brackets, a time function versus
@@ -33,14 +34,18 @@ export interface ColorSettings {
   quietFunctions: boolean;
   /** Operators (*2 , !) in their level's colour, not dimmed. */
   evenOperators: boolean;
+  /** Hue shift per nesting level, in degrees. */
+  hueStep: number;
 }
 
+// Chosen on Tokyo Night: quiet functions, even operators, 30° hue steps.
 export const defaultColorSettings: ColorSettings = {
   shades: false,
   twoLevels: false,
   bracketsOnly: false,
-  quietFunctions: false,
-  evenOperators: false,
+  quietFunctions: true,
+  evenOperators: true,
+  hueStep: 30,
 };
 
 export const colorSettings = Facet.define<
@@ -73,7 +78,7 @@ export interface RoleSpec {
   prefer?: Tag;
   /**
    * A nesting level: level 0 is the theme's string colour, each deeper level
-   * the theme colour nearest in hue to it among those not yet used.
+   * its hue nudged a small step further (see depthPalette).
    */
   depth?: number;
   /** Share another role's colour instead of getting one. */
@@ -138,7 +143,7 @@ const pickColors = (view: EditorView, roles: RoleSpec[]) => {
   const depthColors = string
     ? settings.shades
       ? depthShades(string)
-      : depthPalette(string, palette)
+      : depthPalette(string, palette, 6, settings.hueStep)
     : [];
   for (const role of roles) {
     if (role.colorOf) continue;
@@ -186,48 +191,36 @@ const hslOf = ([r, g, b]: [number, number, number]) => {
   return { h: h * 60, s, l };
 };
 
-const hueDistance = (a: number, b: number) => {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-};
-
 /**
- * Colours for nesting levels: the base (string) colour, then the theme's
- * colours by how close their hue is to it, so levels drift through similar
- * colours wherever that theme's palette lies. Colours nearly identical to
- * one already chosen are skipped. With too few, fall back to hue steps.
+ * Colours for nesting levels: the base (string) colour, then the same colour
+ * with its hue nudged a small step per level, so levels stay one family
+ * (green never drifts to yellow). The direction follows the theme: towards
+ * its colour nearest in hue to the base.
  */
 const depthPalette = (
   base: string,
   palette: string[],
   levels = 6,
+  step = 6,
 ): string[] => {
-  const baseRgb = rgbOf(base);
-  if (!baseRgb) return [base];
-  const baseHsl = hslOf(baseRgb);
-  const chosen = [base];
-  const byHue = palette
-    .map((c) => ({ c, hsl: rgbOf(c) && hslOf(rgbOf(c)!) }))
-    .filter((x) => x.hsl && x.hsl.s > 0.15)
-    .sort(
-      (a, b) =>
-        hueDistance(a.hsl!.h, baseHsl.h) - hueDistance(b.hsl!.h, baseHsl.h),
-    );
-  for (const { c, hsl } of byHue) {
-    if (chosen.length >= levels) break;
-    const close = chosen.some((x) => {
-      const o = rgbOf(x) && hslOf(rgbOf(x)!);
-      return o && hueDistance(o.h, hsl!.h) < 12;
-    });
-    if (!close) chosen.push(c);
-  }
-  for (let i = 1; chosen.length < levels; i++) {
-    const h = (baseHsl.h + 28 * i) % 360;
-    chosen.push(
-      `hsl(${h}, ${Math.round(baseHsl.s * 100)}%, ${Math.round(baseHsl.l * 100)}%)`,
-    );
-  }
-  return chosen;
+  const rgb = rgbOf(base);
+  if (!rgb) return [base];
+  const { h, s, l } = hslOf(rgb);
+  // Signed hue offset from the base to the theme's nearest coloured hue.
+  const offsets = palette
+    .map((c) => rgbOf(c) && hslOf(rgbOf(c)!))
+    .filter((x): x is { h: number; s: number; l: number } => !!x && x.s > 0.15)
+    .map((x) => ((x.h - h + 540) % 360) - 180)
+    .filter((d) => Math.abs(d) > 4)
+    .sort((a, b) => Math.abs(a) - Math.abs(b));
+  const direction = (offsets[0] ?? 1) < 0 ? -1 : 1;
+  return Array.from({ length: levels }, (_, d) =>
+    d === 0
+      ? base
+      : `hsl(${Math.round((h + direction * step * d + 360) % 360)}, ${Math.round(
+          s * 100,
+        )}%, ${Math.round(l * 100)}%)`,
+  );
 };
 
 /**
@@ -319,7 +312,7 @@ export const roleHighlighting = (
   const theme = EditorView.baseTheme(
     Object.fromEntries(
       roles.map((r) => [
-        `.cm-role-${r.name}, .cm-role-${r.name} *`,
+        `.cm-role-${r.name}, .cm-role-${r.name} *:not(${notCursors})`,
         {
           color: `var(--cm-role-${r.colorOf ?? r.name}) !important`,
           ...r.style,

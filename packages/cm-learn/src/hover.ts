@@ -127,6 +127,8 @@ class HoverView {
       if (pos !== null) hit = this.provider(view.state, pos, mode);
       if (hit && mode === "outline")
         hit = { from: hit.from, to: hit.to, tip: "" };
+      const color = hit && colorAt(this.mouse.x, this.mouse.y);
+      if (color) view.dom.style.setProperty("--cm-learn-underline", color);
     }
     if (!sameHit(hit, view.state.field(hitField)))
       view.dispatch({ effects: setHit.of(hit) });
@@ -186,12 +188,22 @@ const hoverPlugin = (provider: LearnProvider) =>
     },
   });
 
+/** Collaborators' cursors and their name labels, drawn inside the text. */
+export const notCursors = ".cm-ySelectionCaret, .cm-ySelectionCaret *";
+
+/** The text colour at a screen point, for the underline. */
+export const colorAt = (x: number, y: number): string | null => {
+  const el = document.elementFromPoint(x, y);
+  return el ? getComputedStyle(el).color : null;
+};
+
 const theme = EditorView.baseTheme({
-  // An underline takes the colour of the element that sets it, so set it on
-  // the syntax-highlighted tokens inside too: each is underlined in its own
-  // theme colour.
-  ".cm-learn-target, .cm-learn-target *": {
+  // One underline colour for the whole span: that of the text under the
+  // mouse (--cm-learn-underline). It's set on the tokens inside too, but
+  // not on collaborators' cursors and name labels drawn inside the text.
+  [`.cm-learn-target, .cm-learn-target *:not(${notCursors})`]: {
     textDecoration: "underline 1px",
+    textDecorationColor: "var(--cm-learn-underline, currentColor)",
     textUnderlineOffset: "3px",
   },
   ".cm-tooltip.cm-learn-tip": {

@@ -1,8 +1,6 @@
 import { CommandsButton } from "@/components/commands-button";
-import { ColorMenu } from "@/components/color-menu";
 import TargetSelect from "@/components/target-select";
 import { cn, isMobilePhone, isTouchDevice } from "@/lib/utils";
-import type { ColorSettings } from "@flok-editor/cm-learn";
 import type { Document } from "@flok-editor/session";
 import { Play } from "lucide-react";
 import { PropsWithChildren, useMemo } from "react";
@@ -20,8 +18,6 @@ interface PaneProps extends PropsWithChildren {
   halfHeight?: boolean;
   isSinglePaneLayout?: boolean;
   onTargetChange: (document: Document, target: string) => void;
-  colorSettings?: ColorSettings;
-  onColorSettingsChange?: (settings: ColorSettings) => void;
   onEvaluateButtonClick: (document: Document) => void;
   onCommandsButtonClick?: () => void;
 }
@@ -32,8 +28,6 @@ export const Pane = ({
   halfHeight,
   isSinglePaneLayout,
   onTargetChange,
-  colorSettings,
-  onColorSettingsChange,
   onEvaluateButtonClick,
   onCommandsButtonClick,
 }: PaneProps) => {
@@ -46,27 +40,16 @@ export const Pane = ({
         halfHeight ? "h-[50vh]" : "h-screen",
       )}
     >
-      <div
-        className={cn(
-          isSinglePaneLayout ? "fixed top-1" : "absolute top-0",
-          "z-10 flex items-center gap-1",
-        )}
-      >
-        <TargetSelect
-          triggerProps={{
-            className:
-              "w-auto h-6 border-none focus:ring-0 focus:ring-offset-0 p-1 bg-slate-900 bg-opacity-70",
-          }}
-          value={document.target}
-          onValueChange={(target) => onTargetChange(document, target)}
-        />
-        {colorSettings && onColorSettingsChange && (
-          <ColorMenu
-            settings={colorSettings}
-            onChange={onColorSettingsChange}
-          />
-        )}
-      </div>
+      <TargetSelect
+        triggerProps={{
+          className: cn(
+            isSinglePaneLayout ? "fixed top-1" : "absolute top-0",
+            "z-10 w-auto h-6 border-none focus:ring-0 focus:ring-offset-0 p-1 bg-slate-900 bg-opacity-70",
+          ),
+        }}
+        value={document.target}
+        onValueChange={(target) => onTargetChange(document, target)}
+      />
       {children}
       {isTouchDevice() && (
         <div
