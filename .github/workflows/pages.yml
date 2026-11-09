@@ -27,6 +27,14 @@ jobs:
           cache: npm
       # Install scripts aren't needed to build the site.
       - run: npm ci --ignore-scripts
+      # The lockfile is made on a Mac, so it only lists the Mac builds of
+      # Vite's native tools; add the Linux ones, at the same versions.
+      - name: Add Linux builds of rollup and esbuild
+        run: |
+          rollup=$(node -p "require('./node_modules/vite/node_modules/rollup/package.json').version")
+          esbuild=$(node -p "require('./node_modules/esbuild/package.json').version")
+          npm install --no-save --ignore-scripts \
+            "@rollup/rollup-linux-x64-gnu@$rollup" "@esbuild/linux-x64@$esbuild"
       # In dependency order; the root `npm run build` (lerna) isn't used.
       - name: Build packages
         run: |
